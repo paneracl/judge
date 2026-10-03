@@ -82,7 +82,7 @@ export OJ_BOX_OFFSET=100
 Only on a host with no existing isolate:
 
 ```bash
-apt install -y libcap-dev libsystemd-dev pkg-config build-essential git g++ python3
+apt install -y libcap-dev libseccomp-dev libsystemd-dev pkg-config build-essential git g++ python3
 git clone https://github.com/ioi/isolate && cd isolate && make install
 isolate-check-environment          # must pass before you trust any timing
 # isolate 2.x on a cgroup-v2 host (Ubuntu 22.04+) also needs libsystemd-dev
