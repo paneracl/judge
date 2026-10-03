@@ -85,8 +85,12 @@ Only on a host with no existing isolate:
 apt install -y libcap-dev libseccomp-dev libsystemd-dev pkg-config build-essential git g++ python3
 git clone https://github.com/ioi/isolate && cd isolate && make install
 isolate-check-environment          # must pass before you trust any timing
-# isolate 2.x on a cgroup-v2 host (Ubuntu 22.04+) also needs libsystemd-dev
-# to build, and its cgroup keeper running (make install ships the unit):
+# isolate 2.7+ runs boxes under uids delegated to an "isolate" user
+# (subid_user in /usr/local/etc/isolate); pick a range free in /etc/subuid:
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin isolate
+sudo usermod --add-subuids 1000000000-1000065535 --add-subgids 1000000000-1000065535 isolate
+# isolate 2.x on a cgroup-v2 host (Ubuntu 22.04+) also needs its cgroup
+# keeper running (make install ships the unit):
 sudo systemctl daemon-reload && sudo systemctl enable --now isolate.service
 ```
 
