@@ -1,0 +1,57 @@
+name: tests
+
+# Proves the judge on a fresh Ubuntu 24.04 machine with cgroup v2 and
+# isolate 2.x -- the same setup a new server gets -- on every push.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      OJ_ISOLATE: /usr/local/bin/isolate
+      ISOLATE_VERSION: v2.7
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcap-dev libsystemd-dev pkg-config build-essential g++ python3-venv
+
+      - name: Build and install isolate
+        run: |
+          git clone --depth 1 --branch "$ISOLATE_VERSION" https://github.com/ioi/isolate /tmp/isolate
+          cd /tmp/isolate
+          make isolate isolate-cg-keeper isolate-check-environment
+          sudo make install
+          sudo systemctl daemon-reload
+          sudo systemctl start isolate.service
+          isolate --version
+          # Informational: a CI VM fails the timing-quality checks (swap,
+          # CPU frequency scaling); a judging server must pass them.
+          sudo isolate-check-environment || true
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -q -r requirements.txt gunicorn whitenoise
+
+      - name: Sandbox tests (real isolate)
+        # isolate is setuid root; run as root so the box owner matches.
+        run: sudo env OJ_ISOLATE=$OJ_ISOLATE .venv/bin/python -m unittest tests.test_isolate -v
+
+      - name: Sandbox tests with the CMS box offset
+        run: sudo env OJ_ISOLATE=$OJ_ISOLATE OJ_BOX_OFFSET=100 .venv/bin/python -m unittest tests.test_isolate
+
+      - name: Site tests
+        working-directory: web
+        run: sudo env OJ_ISOLATE=$OJ_ISOLATE ../.venv/bin/python manage.py test core -v 2
+
+      - name: Migrations are up to date
+        working-directory: web
+        run: ../.venv/bin/python manage.py makemigrations --check --dry-run
